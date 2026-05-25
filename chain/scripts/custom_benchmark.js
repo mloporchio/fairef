@@ -6,26 +6,11 @@
 
 const hre = require("hardhat");
 const fs = require("fs");
-const yargs = require("yargs/yargs");
-const { hideBin } = require("yargs/helpers");
 const { resolveCustomerSigner } = require("./lib/signers");
 
-// Parse command line arguments.
-const args = yargs(hideBin(process.argv))
-    .option("numRequests", {
-        description: "Number of requests to perform",
-        type: "number",
-        default: 15
-    })
-    .option("outputFile", {
-        description: "Path of the output file",
-        type: "string",
-        default: "benchmark_results.csv"
-    })
-    .argv;
-
-const NUM_REQUESTS = args.numRequests; // Number of requests to perform.
-const OUTPUT_FILE = args.outputFile; // Path of the output file.
+const NUM_REQUESTS = 16; // Number of requests to perform.
+const OUTPUT_FILE = "benchmark_results.csv"; // Path of the output file.
+const PROMPT_TEXT = "To be or not to be";
 
 async function main() {
     console.log("[BENCHMARK] Starting automated DON latency evaluation...\n");
@@ -49,29 +34,23 @@ async function main() {
     // Initialize CSV Telemetry Data
     const csvHeader = "Iteration,Timestamp,OffChain_Storage(ms),OnChain_RequestTx(ms),OnChain_ApprovalTx(ms),OCR_Consensus_And_FulfillmentTx(ms),Total_Latency(ms)\n";
     fs.writeFileSync(OUTPUT_FILE, csvHeader);
-    const promptVariants = [
-        "To be or not to be that is the question",
-        "O brave new world that has such people in it",
-        "The course of true love never did run smooth",
-        "All the world is a stage and all the men and women merely players",
-    ];
 
     for (let i = 1; i <= NUM_REQUESTS; i++) {
         console.log(`========================================`);
         console.log(` ITERATION ${i} / ${NUM_REQUESTS}`);
         console.log(`========================================`);
 
-        const simplePayload = promptVariants[(i - 1) % promptVariants.length];
-        const t0 = performance.now();
-
         // ---------------------------------------------------------------------
         // PHASE 1: Off-Chain Storage (IPFS Upload)
         // ---------------------------------------------------------------------
-        process.stdout.write('[1/4] Off-Chain Storage (IPFS Upload)... ');
-        const { cid } = await ipfs.add(simplePayload);
+        console.log("[1/4] Off-Chain Storage (IPFS Upload)...");
+        const startTime = performance.now();
+        const { cid } = await ipfs.add(PROMPT_TEXT);
+        const endTime = performance.now();
+        const tIpfs = endTime - startTime;
         const cidString = cid.toString();
-        const tIpfs = performance.now();
-        console.log(`[+] ${(tIpfs - t0).toFixed(2)} ms | CID: ${cidString}`);
+        console.log(`CID: ${cidString}`);
+        console.log(`Elapsed time: ${tIpfs.toFixed(3)} ms\n`);
 
         // ---------------------------------------------------------------------
         // PHASE 2: Customer Request (On-Chain Transaction)
@@ -85,13 +64,14 @@ async function main() {
             });
         });
 
-        process.stdout.write(`[2/4] On-Chain Customer Request (Tx)... `);
-        const paymentAmount = await aggregatorContract.queryFee();
-        
+        console.log("[2/4] On-Chain Customer Request (TX)...");
+        const startTime = performance.now();
+        const paymentAmount = await aggregatorContract.queryFee(); // Read query fee.
         const tx = await aggregatorContract.requestAttribution(cidString, { value: paymentAmount });
         const receipt = await tx.wait();
-        const tPhase1 = performance.now();
-        console.log(`[+] ${(tPhase1 - tIpfs).toFixed(0)} ms`);
+        const endTime = performance.now();
+        const tPhase1 = endTime - startTime;
+        console.log(`Elapsed time: ${tPhase1.toFixed(3)} ms\n`);
 
         // Extract RequestID from the transaction logs
         let currentJobId = null;
@@ -108,17 +88,19 @@ async function main() {
         // ---------------------------------------------------------------------
         // PHASE 3: Validation & Approval (Model Creator Tx)
         // ---------------------------------------------------------------------
-        process.stdout.write(`[3/4] On-Chain Approval (Model Creator Tx)... `);
+        console.log("[3/4] On-Chain Approval (Model Creator TX)...");
+        const startTime = performance.now();
         const approvedJobId = await approvalPromise; // Resolves when the separate Creator script approves the job
-        const tPhase2 = performance.now();
-        console.log(`[+] ${(tPhase2 - tPhase1).toFixed(2)} ms`);
+        const endTime = performance.now();
+        const tPhase2 = endTime - startTime;
+        console.log(`Elapsed time: ${tPhase2.toFixed(3)} ms\n`);
 
         // ---------------------------------------------------------------------
         // PHASE 4: OCR Network Execution (AI Inference + P2P Consensus)
         // ---------------------------------------------------------------------
-        console.log(`[4/4] Off-Chain Reporting (AI + BFT Consensus)... Waiting`);
+        console.log(`[4/4] Off-Chain Reporting (AI + BFT Consensus)...`);
+        const startTime = performance.now();
         let winnerAddress = "";
-
         await new Promise((resolve, reject) => {
             const timeout = setTimeout(() => {
                 reject(new Error(`Timeout: JobCompleted event missed for Job #${currentJobId}`));
@@ -134,30 +116,32 @@ async function main() {
             };
             verifierContract.on("JobCompleted", fulfillmentListener);
         });
-
-        const tPhase3 = performance.now();
-        console.log(`      OCR Fulfillment On-Chain Tx detected in ${(tPhase3 - tPhase2).toFixed(2)} ms`);
-        console.log(`      Transmitter Node Identity: ${winnerAddress}\n`);
+        const endTime = performance.now();
+        const tPhase3 = endTime - startTime;
+        console.log(`Elapsed time: ${tPhase3.toFixed(3)} ms`);
+        console.log(`Transmitter Node Identity: ${winnerAddress}\n`);
 
         // ---------------------------------------------------------------------
         // TELEMETRY EXPORT
         // ---------------------------------------------------------------------
-        const timeIpfs     = (tIpfs   - t0).toFixed(2);
-        const timePhase1   = (tPhase1 - tIpfs).toFixed(2);
-        const timePhase2   = (tPhase2 - tPhase1).toFixed(2);
-        const timePhase3   = (tPhase3 - tPhase2).toFixed(2);
-        const totalTime    = (tPhase3 - t0).toFixed(2);
+        const totalTime = tIpfs + tPhase1 + tPhase2 + tPhase3; // Compute total time.
 
-        const csvRow = `${i},${Date.now()},${timeIpfs},${timePhase1},${timePhase2},${timePhase3},${totalTime}\n`;
+        // Format all timings to 3 decimal places for CSV export.
+        const tIpfsStr = tIpfs.toFixed(3);
+        const tPhase1Str = tPhase1.toFixed(3);
+        const tPhase2Str = tPhase2.toFixed(3);
+        const tPhase3Str = tPhase3.toFixed(3);
+        const totalTimeStr = totalTime.toFixed(3);
+        const csvRow = `${i},${Date.now()},${tIpfsStr},${tPhase1Str},${tPhase2Str},${tPhase3Str},${totalTimeStr}\n`;
         fs.appendFileSync(OUTPUT_FILE, csvRow);
         
-        console.log(`[OK] Iteration ${i} saved. Total Latency: ${totalTime} ms\n`);
+        console.log(`[OK] Iteration ${i} saved. Total Latency: ${totalTimeStr} ms\n`);
 
         // RPC Cooldown period
         await new Promise(resolve => setTimeout(resolve, 3000));
     }
     
-    console.log(`\n Benchmark completed successfully! Data exported to: ${OUTPUT_FILE}`);
+    console.log(`\nBenchmark completed successfully! Data exported to: ${OUTPUT_FILE}`);
 }
 
 main().catch((error) => {

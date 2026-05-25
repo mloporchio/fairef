@@ -68,7 +68,7 @@ fi
 ROOT_DIR=$(pwd)
 CHAIN_DIR="${ROOT_DIR}/chain"
 SCRIPTS_DIR="${CHAIN_DIR}/scripts"
-RESULTS_DIR="${ROOT_DIR}/results"
+RESULTS_DIR="${ROOT_DIR}/results/benchmark"
 DOCKER_LOG_FILE="${ROOT_DIR}/docker_output.log"
 LISTENER_LOG_FILE="${ROOT_DIR}/listener_output.log"
 REQUESTS_SCRIPT="custom_benchmark.js"

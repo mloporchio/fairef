@@ -106,7 +106,9 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("-n", "--num-oracles", type=int)
     parser.add_argument("-s", "--network-seed", "--seed", type=int)
-    parser.add_argument("-o", "--max-output-size", type=int)
+    parser.add_argument("-o", "--max-output-size", type=int, default=3000)
+    parser.add_argument("--num-holders", type=int, default=100)
+    parser.add_argument("--mining-interval", type=int, default=12000)
     parser.add_argument(
         "--key-seed",
         help="Seed used for oracle Ethereum keys. Defaults to --network-seed.",
@@ -667,6 +669,8 @@ def render_compose(
         f"# KEY_SEED={args.key_seed}",
         f"# MALICIOUS_ALTER_COUNT={args.malicious_alter_count}",
         f"# MALICIOUS_TIMEOUT_COUNT={args.malicious_timeout_count}",
+        f"# MAX_OUTPUT_SIZE={args.max_output_size}",
+        f"# NUM_HOLDERS={args.num_holders}",
         "# The chain service mounts a generated Hardhat config so the seed-derived",
         "# oracle accounts are funded when npx hardhat node starts.",
         "# The chain service mounts a generated deploy script with matching OCR params.",
@@ -696,6 +700,8 @@ def render_compose(
         "MALICIOUS_MODE": "false",
         "NUM_ORACLES": str(args.num_oracles),
         "FAULT_TOLERANCE": str(args.fault_tolerance),
+        "MAX_OUTPUT_SIZE": str(args.max_output_size),
+        "NUM_HOLDERS": str(args.num_holders),
         "OCR_SEED": str(args.ocr_seed),
         "NETWORK_SEED": str(args.network_seed),
         "ORACLE_IPS": oracle_ips_csv,
@@ -729,6 +735,7 @@ def render_compose(
             f"      - {yaml_quote(env_file)}",
             "    environment:",
             f"      NUM_ORACLES: {yaml_quote(args.num_oracles)}",
+            f"      NUM_HOLDERS: {yaml_quote(args.num_holders)}",
             f"      FAULT_TOLERANCE: {yaml_quote(args.fault_tolerance)}",
             f"      CONFIG_DIGEST: {yaml_quote(config_digest)}",
             "    volumes:",
@@ -937,6 +944,10 @@ def render_hardhat_config(
             "    hardhat: {",
             "      chainId: Number(process.env.CHAIN_ID || 31337),",
             f"      blockGasLimit: Number(process.env.BLOCK_GAS_LIMIT || {args.block_gas_limit}),",
+            "      mining: {",
+            "       auto: true,",
+            f"       interval: {args.mining_interval},",
+            "      },",
             "      accounts,",
             "    },",
             "    localhost: {",
@@ -962,7 +973,7 @@ def render_deploy_script(args: argparse.Namespace, config_digest: str) -> str:
             'const REQUEST_FEE = hre.ethers.parseEther("0.01");',
             'const ORACLE_REWARD = hre.ethers.parseEther("0.003");',
             'const MODEL_CREATOR_REWARD = hre.ethers.parseEther("0.002");',
-            "const NUM_HOLDERS = 1000;",
+            f"const NUM_HOLDERS = {args.num_holders};",
             "const FILTER_POLICIES = {",
             "  TOP_VALUES: 0,",
             "  TOP_HOLDERS: 1,",
@@ -1082,6 +1093,7 @@ def render_deploy_script(args: argparse.Namespace, config_digest: str) -> str:
             "  console.log(`OracleVerifier deployed at: ${verifierAddress}`);",
             "",
             '  console.log("\\n[3/5] Deploying RoyaltyManager...");',
+            '  console.log(`Deploying the contract with ${NUM_HOLDERS} random data holder addresses...`);',
             "  const holdersArray = Array.from({ length: NUM_HOLDERS }, randomAddress);",
             '  const RoyaltyManager = await hre.ethers.getContractFactory("RoyaltyManager", modelCreator);',
             "  const royaltyManager = await RoyaltyManager.deploy(holdersArray, verifierAddress);",
@@ -1119,7 +1131,7 @@ def render_deploy_script(args: argparse.Namespace, config_digest: str) -> str:
             "  await assertFilterPolicy(aggregator, filterPolicy, filterThreshold);",
             "",
             '  console.log("\\n=======================================================");',
-            '  console.log(" DEPLOYMENT FINISHED SUCCESSFULLY!");',
+            '  console.log(" DEPLOYMENT COMPLETED SUCCESSFULLY!");',
             "  console.log(` QUEUE_ADDRESS=${queueAddress}`);",
             "  console.log(` VERIFIER_ADDRESS=${verifierAddress}`);",
             "  console.log(` ROYALTY_MANAGER_ADDRESS=${royaltyManagerAddress}`);",
