@@ -44,10 +44,9 @@ async function main() {
         // PHASE 1: Off-Chain Storage (IPFS Upload)
         // ---------------------------------------------------------------------
         console.log("[1/4] Off-Chain Storage (IPFS Upload)...");
-        const startTime = performance.now();
+        const tIpfsStart = performance.now();
         const { cid } = await ipfs.add(PROMPT_TEXT);
-        const endTime = performance.now();
-        const tIpfs = endTime - startTime;
+        const tIpfs = performance.now() - tIpfsStart;
         const cidString = cid.toString();
         console.log(`CID: ${cidString}`);
         console.log(`Elapsed time: ${tIpfs.toFixed(3)} ms\n`);
@@ -65,12 +64,11 @@ async function main() {
         });
 
         console.log("[2/4] On-Chain Customer Request (TX)...");
-        const startTime = performance.now();
+        const tPhase1Start = performance.now();
         const paymentAmount = await aggregatorContract.queryFee(); // Read query fee.
         const tx = await aggregatorContract.requestAttribution(cidString, { value: paymentAmount });
         const receipt = await tx.wait();
-        const endTime = performance.now();
-        const tPhase1 = endTime - startTime;
+        const tPhase1 = performance.now() - tPhase1Start;
         console.log(`Elapsed time: ${tPhase1.toFixed(3)} ms\n`);
 
         // Extract RequestID from the transaction logs
@@ -89,17 +87,16 @@ async function main() {
         // PHASE 3: Validation & Approval (Model Creator Tx)
         // ---------------------------------------------------------------------
         console.log("[3/4] On-Chain Approval (Model Creator TX)...");
-        const startTime = performance.now();
+        const tPhase2Start = performance.now();
         const approvedJobId = await approvalPromise; // Resolves when the separate Creator script approves the job
-        const endTime = performance.now();
-        const tPhase2 = endTime - startTime;
+        const tPhase2 = performance.now() - tPhase2Start;
         console.log(`Elapsed time: ${tPhase2.toFixed(3)} ms\n`);
 
         // ---------------------------------------------------------------------
         // PHASE 4: OCR Network Execution (AI Inference + P2P Consensus)
         // ---------------------------------------------------------------------
         console.log(`[4/4] Off-Chain Reporting (AI + BFT Consensus)...`);
-        const startTime = performance.now();
+        const tPhase3Start = performance.now();
         let winnerAddress = "";
         await new Promise((resolve, reject) => {
             const timeout = setTimeout(() => {
@@ -116,8 +113,7 @@ async function main() {
             };
             verifierContract.on("JobCompleted", fulfillmentListener);
         });
-        const endTime = performance.now();
-        const tPhase3 = endTime - startTime;
+        const tPhase3 = performance.now() - tPhase3Start;
         console.log(`Elapsed time: ${tPhase3.toFixed(3)} ms`);
         console.log(`Transmitter Node Identity: ${winnerAddress}\n`);
 

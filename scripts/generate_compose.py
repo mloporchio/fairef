@@ -945,7 +945,7 @@ def render_hardhat_config(
             "      chainId: Number(process.env.CHAIN_ID || 31337),",
             f"      blockGasLimit: Number(process.env.BLOCK_GAS_LIMIT || {args.block_gas_limit}),",
             "      mining: {",
-            "       auto: true,",
+            "       auto: false,",
             f"       interval: {args.mining_interval},",
             "      },",
             "      accounts,",
