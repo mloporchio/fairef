@@ -88,7 +88,7 @@ func (t *ethTransmitter) FromAccount(context.Context) (ocrtypes.Account, error) 
 //function transmit(bytes32 configDigest, uint64 seqNr, bytes report, bytes attestation)
 
 // Transmit broadcasts the consensus outcome to the Ethereum blockchain.
-// La firma rispetta al 100% l'interfaccia ocr3types.ContractTransmitter.
+// The signature is 100% compliant with the ocr3types.ContractTransmitter interface.
 func (t *ethTransmitter) Transmit(
 	ctx context.Context,
 	digest ocrtypes.ConfigDigest,
@@ -209,7 +209,7 @@ func (t *ethTransmitter) Transmit(
 
 	if err != nil {
 		if strings.Contains(err.Error(), "already fulfilled") || strings.Contains(err.Error(), "revert") {
-			fmt.Printf("[Oracle %d] Race condition intercettata dal contratto (Revert).\n", t.oracleID)
+			fmt.Printf("[Oracle %d] Race condition intercepted by the contract (Revert).\n", t.oracleID)
 			MarkJobAsProcessed(jobId64)
 			return nil
 		}
