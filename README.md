@@ -60,6 +60,7 @@ Follow these steps to set up the project locally:
     npm install
     cd ..
 ```
+<!--
 3. **Install Python dependencies for the AI backend**
 ```bash
     cd model
@@ -67,6 +68,7 @@ Follow these steps to set up the project locally:
     source .venv/bin/activate
     pip3 install dattri torch numpy transformers datasets tiktoken wandb tqdm Flask
 ```
+-->
 
 ## How to run
 
